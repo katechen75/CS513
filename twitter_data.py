@@ -8,7 +8,7 @@
 # When prompted, type in the username you wish to search or "STOP" to terminate the program
 
 import tweepy
-
+import pandas as pd
 ### PUT AUTHENTICATOIN KEYS HERE ###
 API_KEY = "XGNkQ0rIzYGjQo3pI5DN7ZiI0"
 API_SECRET_KEY = "rfaLXwGsLQL6dExb6k4YQrAxtvkoy98Y4f4u8XV6bXrhdOOovp"
@@ -59,31 +59,53 @@ def retrieveUserTweets():
     tweetCount += 1
     print("TWEET " + str(tweetCount) + ": " + tweets.text + "\n")
 
+def retreiveTweetInfo(tweet):
+  result = []
+  screen_name = tweet.user.screen_name
+  followers = tweet.user.followers_count
+  location = tweet.user.location
+  created_at = tweet.created_at
+  retweet_count = tweet.retweet_count
+  ## liked_count is returning 0 for all, idk why
+  liked_count = tweet.favorite_count
+  result = [screen_name, followers, location, created_at, retweet_count, liked_count]
+  return result
+
+
 def searchKeyword():
   # Keyword
   # removed: -filter:links
   searchQuery = 'Covid OR COVID OR covid ' 
-  new_tweets = api.search(q = searchQuery, count = 1, result_type = "recent", lang = "en")
-  print(new_tweets.text)
+  data = []
+  new_tweets = tweepy.Cursor(api.search, q = searchQuery,result_type = "recent", lang = "en").items(10)
+  for tweet in new_tweets:
+    tweet_list = retreiveTweetInfo(tweet)
+    data.append(tweet_list)
+  return data
+  
 
 # continuous loop until the user types "STOP"
-while True:
+# while True:
   # prompts user for username to search and analyze
-  inputName = input("Please enter your twitter user name or 'STOP' to end: ")
-  userName = api.get_user(inputName)
+  # inputName = input("Please enter your twitter user name or 'STOP' to end: ")
+  # userName = api.get_user(inputName)
 
-  # checks if the input is "STOP"
-  if inputName == "STOP":
-    # stops the program (breaks) and prints message
-    print("\nProgram ended, thank you for using twitter_data.py! ")
-    break
-  else:
-    # runs function then prompts user for name again
-    print("\n------------- Account Information ---------------")
-    retrieveAccountInfo()
-    print("\n------------- Recent 5 Followers ----------------")
-    retrieveUserFollowers()
-    print("\n-------------- Recent 5 Tweets ------------------")
-    retrieveUserTweets()  
-    print("\n---------- Recent 5 COVID searches --------------")
-    searchKeyword()  
+  # # checks if the input is "STOP"
+  # if inputName == "STOP":
+  #   # stops the program (breaks) and prints message
+  #   print("\nProgram ended, thank you for using twitter_data.py! ")
+  #   break
+  # else:
+  #   # runs function then prompts user for name again
+  #   print("\n------------- Account Information ---------------")
+  #   retrieveAccountInfo()
+  #   print("\n------------- Recent 5 Followers ----------------")
+  #   retrieveUserFollowers()
+  #   print("\n-------------- Recent 5 Tweets ------------------")
+  #   retrieveUserTweets()  
+print("\n---------- Recent 5 COVID searches --------------")
+tweetData = searchKeyword()
+
+tweet_df = pd.DataFrame(data=tweetData, columns=['Username', '# of Followers', 'Location', 'Tweet Created At', '# of Retweets', '# of Likes'])
+
+tweet_df.to_csv('tweets_data.csv', header=True )
