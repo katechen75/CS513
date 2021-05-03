@@ -3,6 +3,10 @@ rm(list = ls())
 library(kknn)
 library(class) 
 library(e1071)
+library(corrplot)
+library(ggplot2)
+library(randomForest)
+library(neuralnet)
 
 file <- file.choose()
 
@@ -13,6 +17,9 @@ View(dataset)
 naValues <- is.na(dataset)
 colSums(naValues)
 
+# convert factors to numerics
+dataset$Is.Tweet.Reply <- ifelse(dataset$Is.Tweet.Reply == 'True', 1, 0)
+
 # gets data type of each column
 sapply(dataset, class)
 
@@ -20,78 +27,56 @@ sapply(dataset, class)
 summary(dataset)
 
 # data analysis
-languageTable <- table(dataset$Language)
-languageLabels <- paste(names(languageTable), languageTable, sep=" ")
-pie(languageTable, col = rainbow(length(languageTable)), main="Distribution of Tweets Via Language Written In")
-legend("bottomright", legend=languageLabels, bty="n", fill=rainbow(length(languageTable)))
-
 replyTable <- table(dataset$Is.Tweet.Reply)
 replyLabels <- paste(names(replyTable), "\n", replyTable, sep="")
 pie(replyTable, labels=replyLabels, main="Distribution of Tweets that are Replies vs Not Replies")
 
-# ADD SOME MORE ANALYSIS HERE
+ggplot(dataset, aes(x=X..of.Likes)) + geom_density()
+plot(dataset$X..of.Likes, dataset$X..of.Retweets, xlab="Likes", ylab="Retweets", pch=19)
+
+# correlation between the variables
+correlations <- cor(dataset[,-c(1,2,3,6,7, 8, 12)])
+corrplot(correlations, method="circle")
 
 # we want to update the dataset to take into account columns that matter in our prediction
-updatedDF <- subset(dataset, select = -c(X, User.ID, Username, Tweet.Text))
+x_data <- subset(dataset, select = -c(X, User.ID, Username, Tweet.Text, Tweet.Created.At, Language))
+
+
 # updating Is Tweet Reply to 1 or 0, 1 is True, 0 is False
-updatedDF$Is.Tweet.Reply <- ifelse(updatedDF$Is.Tweet.Reply == 'True', 1, 0)
-View(updatedDF)
+x_data[,c(1,2,4)] <- scale(x_data[,c(1,2,4)])
 
-### We want to predict whether the next tweet about COVID-19 is a Reply to another tweet, or an original tweet
-### Classification problem
+x_data$X..of.Likes <- factor(x_data$X..of.Likes, order=TRUE)
 
-##Define max-min normalization function for KNN
-normalization <-function(x,minx,maxx) {
-  z<-((x-minx)/(maxx-minx))
-  return(z) 
-}
-
-# normalized dataset 
-dataset_normalized <- as.data.frame(         
-  cbind(
-        X..of.Followers=normalization(updatedDF[,c(1)],min(updatedDF[,c(1)]),max(updatedDF[,c(1)])),
-        X..of.Friends=normalization(updatedDF[,c(2)],min(updatedDF[,c(2)]),max(updatedDF[,c(2)])),
-        Tweet.ID=updatedDF[,c(3)],
-        Tweet.Created.At=updatedDF[,c(4)],
-        X..of.Retweets=normalization(updatedDF[,c(5)],min(updatedDF[,c(5)]),max(updatedDF[,c(5)])),
-        X..of.Likes=normalization(updatedDF[,c(6)],min(updatedDF[,c(6)]),max(updatedDF[,c(6)])),
-        Is.Tweet.Reply=updatedDF[,c(7)],
-        Language=updatedDF[,c(8)]
-    )
-)
+str(x_data)
+### We want to predict whether the number of likes in the next COVID-19 tweet
 
 # Split data into training and testing
 # 70% training
 # 30% testing
-index <- sort(sample(nrow(updatedDF), as.integer(0.7 * nrow(updatedDF))))
+index <- sort(sample(nrow(x_data), as.integer(0.7 * nrow(x_data))))
+x_train <- x_data[index,]
+x_test <- x_data[-index,]
 
-trainingData_normalized <- dataset_normalized[index,]
-testingData_normalized <- dataset_normalized[-index,]
+# Linear Regression
+linearRegression <- glm(X..of.Likes~., data = x_train[,-c(3)])
+linearRegressionPredict <- predict(linearRegression, x_test, type="response")
+#change to a fancier plot
+plot(x_test$X..of.Likes, linearRegressionPredict, xlab='Actual', ylab='Prediction', main='Linear Regression')
+summary(linearRegression)
+# get accuracy and error rate for linear regression
 
-### KNN IS STILL IN PROGRESS
-knn_prediction <- kknn(formula=X..of.Likes~., trainingData_normalized[,-c(3,4)], testingData_normalized[,-c(3,4)], k=5, kernel = "triangular")
-fit_knnNorm <- fitted(knn_prediction)
-tb<-table(Actual=testingData_normalized$X..of.Likes, Fitted=fit_knnNorm)
-tb
-# check error rate
-accuracy <- (sum(diag(tb)))/sum(tb)
-accuracy
-wrong <- (testingData_normalized$X..of.Likes != fit_knnNorm)
-rate <- sum(wrong) / length(wrong)
-rate
-plot(fit_knnNorm)
+# KNN
 
-## Naive Bayes implementation
-nBayes <- naiveBayes(Is.Tweet.Reply~., trainingData_normalized[,-c(3,4)])
-predictionClass <-predict(nBayes, testingData_normalized[,-c(3,4)])
+# Decision Tree
 
-## Results of Naive Bayes Implementation
-tb1 <- table(Class=testingData_normalized$Is.Tweet.Reply, predictionClass)
-prop.table(table(Class=testingData_normalized$Is.Tweet.Reply, predictionClass))
+# Random Forest
+randomForestFit <- randomForest(X..of.Likes~., data=x_train[,-c(3)], importance=TRUE, ntree=1000)
+importance(randomForestFit)
+varImpPlot(randomForestFit)
+randomForestPrediction <- predict(randomForestFit, x_test[,-c(4)])
+plot(randomForestFit)
+# get accuracy and error rate for random forest
 
-NB_accuracy <- ((sum(diag(tb1))))/sum(tb1)
-NB_accuracy
-NB_wrong<-sum(predictionClass!=testingData_normalized$Is.Tweet.Reply)
-NB_wrong
-NB_error_rate<-NB_wrong/length(predictionClass)
-NB_error_rate
+# Neural Net
+neuralNetModel <- neuralnet(X..of.Likes~., x_train[,-c(3)], hidden = 5 , threshold = 0.01, rep=10)
+plot(neuralNetModel)
