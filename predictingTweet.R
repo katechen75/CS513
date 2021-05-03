@@ -6,7 +6,11 @@ library(e1071)
 library(corrplot)
 library(ggplot2)
 library(randomForest)
-library(neuralnet)
+library(rpart)
+library(rpart.plot)
+library(rattle)
+library(RColorBrewer)
+library(caret)
 
 file <- file.choose()
 
@@ -17,8 +21,7 @@ View(dataset)
 naValues <- is.na(dataset)
 colSums(naValues)
 
-# convert factors to numerics
-dataset$Is.Tweet.Reply <- ifelse(dataset$Is.Tweet.Reply == 'True', 1, 0)
+
 
 # gets data type of each column
 sapply(dataset, class)
@@ -33,50 +36,67 @@ pie(replyTable, labels=replyLabels, main="Distribution of Tweets that are Replie
 
 ggplot(dataset, aes(x=X..of.Likes)) + geom_density()
 plot(dataset$X..of.Likes, dataset$X..of.Retweets, xlab="Likes", ylab="Retweets", pch=19)
+# analysis top hashtags here
+
+# convert factors to numerics
+dataset$Is.Tweet.Reply <- ifelse(dataset$Is.Tweet.Reply == 'True', 1, 0)
 
 # correlation between the variables
-correlations <- cor(dataset[,-c(1,2,3,6,7, 8, 12)])
+correlations <- cor(dataset[,-c(1,2,6,7, 8,9, 13)])
 corrplot(correlations, method="circle")
 
+
 # we want to update the dataset to take into account columns that matter in our prediction
-x_data <- subset(dataset, select = -c(X, User.ID, Username, Tweet.Text, Tweet.Created.At, Language))
+x_data <- subset(dataset, select = -c(User.ID, Username, Tweet.Text, Tweet.Created.At, Day.Of.Week, Tweet.HashTags, X..of.Likes))
+y_data <- subset(dataset, select = c(X..of.Likes))
 
+normalize <- function(x) {
+  return ((x - min(x)) / (max(x) - min(x))) 
+}
 
-# updating Is Tweet Reply to 1 or 0, 1 is True, 0 is False
-x_data[,c(1,2,4)] <- scale(x_data[,c(1,2,4)])
+# we do not want to normalize TweetId
+normalized_dataset <- as.data.frame(lapply(x_data[,-c(4)], normalize))
 
-x_data$X..of.Likes <- factor(x_data$X..of.Likes, order=TRUE)
-
-str(x_data)
 ### We want to predict whether the number of likes in the next COVID-19 tweet
 
 # Split data into training and testing
 # 70% training
 # 30% testing
 index <- sort(sample(nrow(x_data), as.integer(0.7 * nrow(x_data))))
-x_train <- x_data[index,]
-x_test <- x_data[-index,]
+x_train <- normalized_dataset[index,]
+x_test <- normalized_dataset[-index,]
+
+y_train <- y_data[index,]
+y_test <- y_data[-index,]
 
 # Linear Regression
-linearRegression <- glm(X..of.Likes~., data = x_train[,-c(3)])
+linearRegression <- lm(y_train~., data = x_train)
 linearRegressionPredict <- predict(linearRegression, x_test, type="response")
-#change to a fancier plot
-plot(x_test$X..of.Likes, linearRegressionPredict, xlab='Actual', ylab='Prediction', main='Linear Regression')
+plot(linearRegressionPredict, y_test, xlab='Prediction', ylab='Actual', main='Linear Regression')
+linearRegressionR2 <- summary(linearRegression)$r.squared
+linearRegressionStandardError <- summary(linearRegression)$sigma
 summary(linearRegression)
-# get accuracy and error rate for linear regression
 
 # KNN
+likesPredictionKNN <- knn(train=x_train, test=x_test, cl=y_train, k=15)
+plot(y_test, likesPredictionKNN, xlab='Actual', ylab='Prediction', main='KNN Regression for Predicting Likes')
+summary(lm(y_test~likesPredictionKNN))$r.square
+likesPredictionKNN.score
 
-# Decision Tree
+# CART
+str(x_train)
+cartModel <- rpart(y_train~., 
+                   data=x_train, method="anova")
+rpart.plot(cartModel)
 
-# Random Forest
-randomForestFit <- randomForest(X..of.Likes~., data=x_train[,-c(3)], importance=TRUE, ntree=1000)
+
+ # Random Forest
+randomForestFit <- randomForest(y_train~., data=data.frame(x_train))
+randomForestFit
 importance(randomForestFit)
 varImpPlot(randomForestFit)
-randomForestPrediction <- predict(randomForestFit, x_test[,-c(4)])
-plot(randomForestFit)
-# get accuracy and error rate for random forest
+randomForestPrediction <- predict(randomForestFit, x_test)
+plot(randomForestPrediction, y_test, xlab='Prediction', ylab='Actual')
+ # check results
+ # get accuracy and error rate for random forest
 
-# Neural Net
-neuralNetModel <- neuralnet(X..of.Likes~., x_train[,-c(3)], hidden = 5 , threshold = 0.01, rep=10)
-plot(neuralNetModel)
