@@ -30,13 +30,46 @@ sapply(dataset, class)
 summary(dataset)
 
 # data analysis
-replyTable <- table(dataset$Is.Tweet.Reply)
-replyLabels <- paste(names(replyTable), "\n", replyTable, sep="")
+datasetAnalysis <- dataset
+datasetAnalysis$X..of.Followers <- ifelse(dataset$X..of.Followers < 1000, "1000 >", 
+                                          ifelse(dataset$X..of.Followers > 10000, "10000 <", "1000 - 10000"))
+datasetAnalysis$X..of.Friends <- ifelse(dataset$X..of.Friends < 1000, "1000 >", 
+                                        ifelse(dataset$X..of.Friends > 10000, "10000 < ", "1000 - 10000"))
 
-pie(replyTable, labels=replyLabels, main="Distribution of Tweets that are Replies vs Not Replies")
+# Comparing the Number of Retweets to Original Tweets
+retweetTable <- table(dataset$Is.Retweet)
+replyLabels <- paste(names(retweetTable), "\n", retweetTable, sep="")
+pie(retweetTable, labels=replyLabels, main="Distribution of Tweets that are Retweet vs Not Retweets")
 
-ggplot(dataset, aes(x=X..of.Likes)) + geom_density()
-plot(dataset$X..of.Likes, dataset$X..of.Retweets, xlab="Likes", ylab="Retweets", pch=19)
+# Desnity graph of Number of LIkes
+ggplot(dataset, aes(x=X..of.Likes)) + geom_density(fill='lightblue') +
+  geom_vline(aes(xintercept=mean(X..of.Likes)), color='red', linetype='dashed', size=1)
+
+# Comparing Likes to Retweets
+ggplot(dataset, aes(x=X..of.Likes, y=X..of.Retweets)) + geom_point() + 
+  geom_smooth() + 
+  theme_minimal() +
+  labs(title='Likes vs Retweets', x="# of Likes", y="# of Retweets")
+
+# Comparing # of Followers
+followersTable <- table(datasetAnalysis$X..of.Followers)
+followersPct <- round(followersTable/sum(followersTable) * 100)
+followerLabels <- paste(followersPct, "%", sep="")
+followerLabels <- paste(followerLabels,names(followersTable))
+pie(followersTable, labels=followerLabels, main="Distrubtion of Followers")
+
+# Comparing # of Following
+followingTable <- table(datasetAnalysis$X..of.Friends)
+followingPct <- round(followingTable/sum(followingTable) * 100)
+followingLabels <- paste(followingPct, "%", sep="")
+followingLabels <- paste(followingLabels,names(followingTable))
+pie(followingTable, labels=followingLabels, main="Distrubtion of Followings")
+
+# Compare the Number of Tweets a User posts to their Followers
+ggplot(dataset, aes(x = X..of.Tweets, y = X..of.Followers)) + geom_point() +
+  geom_smooth() +
+  theme_minimal() +
+  labs(title='Tweets vs Followers', x="# of Tweets", y="# of Followers")
 
 # analysis top hashtag here
 hashtags <- dataset$Tweet.HashTags
@@ -51,7 +84,7 @@ uniqueTags <- unique(na.omit(hashTagList))
 uniqueTags[which.max(tabulate((match(hashTagList, uniqueTags))))]
 
 # convert factors to numerics
-dataset$Is.Tweet.Reply <- ifelse(dataset$Is.Tweet.Reply == 'True', 1, 0)
+dataset$Is.Retweet <- ifelse(dataset$Is.Retweet == TRUE, 1, 0)
 
 # correlation between the variables
 correlations <- cor(dataset[,-c(1,2,6,7, 8,9, 13)])
@@ -80,10 +113,17 @@ x_test <- normalized_dataset[-index,]
 y_train <- y_data[index,]
 y_test <- y_data[-index,]
 
+ggplot(dataset, aes(x = X..of.Tweets, y = X..of.Followers)) + geom_point() +
+  geom_smooth() +
+  theme_minimal() +
+  labs(title='Tweets vs Followers', x="# of Tweets", y="# of Followers")
 # Linear Regression
 linearRegression <- lm(y_train~., data = x_train)
 linearRegressionPredict <- predict(linearRegression, x_test, type="response")
-plot(linearRegressionPredict, y_test, xlab='Prediction', ylab='Actual', main='Linear Regression')
+ggplot(NULL,aes(x=linearRegressionPredict, y=y_test)) + geom_point() +
+  geom_smooth() + 
+  theme_minimal() +
+  labs(title="Linear Regression", x="Prediction", y='Actual')
 linearRegressionSummary <- summary(linearRegression)
 linearRegressionR2 <- linearRegressionSummary$r.squared
 linearRegressionStandardError <- linearRegressionSummary$sigma
@@ -105,11 +145,13 @@ cartStandardError <- cartSummary$sigma
 
 # Random Forest
 randomForestFit <- randomForest(y_train~., data=data.frame(x_train))
-randomForestFit
 importance(randomForestFit)
 varImpPlot(randomForestFit)
 randomForestPrediction <- predict(randomForestFit, x_test)
-plot(randomForestPrediction, y_test, xlab='Prediction', ylab='Actual')
+ggplot(NULL,aes(x=randomForestPrediction, y=y_test)) + geom_point() +
+  geom_smooth() + 
+  theme_minimal() +
+  labs(title="Random Forest", x="Prediction", y='Actual')
 randomForestSummary <- summary(lm(y_test~randomForestPrediction))
 randomForestR2 <- randomForestSummary$r.squared
 randomForestStandardError <- randomForestSummary$sigma
