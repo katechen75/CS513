@@ -11,6 +11,8 @@ library(rpart.plot)
 library(rattle)
 library(RColorBrewer)
 library(caret)
+library(dplyr)
+library(stringr)
 
 file <- file.choose()
 
@@ -21,8 +23,6 @@ View(dataset)
 naValues <- is.na(dataset)
 colSums(naValues)
 
-
-
 # gets data type of each column
 sapply(dataset, class)
 
@@ -32,11 +32,23 @@ summary(dataset)
 # data analysis
 replyTable <- table(dataset$Is.Tweet.Reply)
 replyLabels <- paste(names(replyTable), "\n", replyTable, sep="")
+
 pie(replyTable, labels=replyLabels, main="Distribution of Tweets that are Replies vs Not Replies")
 
 ggplot(dataset, aes(x=X..of.Likes)) + geom_density()
 plot(dataset$X..of.Likes, dataset$X..of.Retweets, xlab="Likes", ylab="Retweets", pch=19)
-# analysis top hashtags here
+
+# analysis top hashtag here
+hashtags <- dataset$Tweet.HashTags
+hashTagList <- list()
+for(i in hashtags){
+  currentHashtag <-unlist(str_extract_all(i, "(\\w+)"))
+  for(element in currentHashtag) {
+    hashTagList <- c(hashTagList, element)
+  }
+}
+uniqueTags <- unique(na.omit(hashTagList))
+uniqueTags[which.max(tabulate((match(hashTagList, uniqueTags))))]
 
 # convert factors to numerics
 dataset$Is.Tweet.Reply <- ifelse(dataset$Is.Tweet.Reply == 'True', 1, 0)
@@ -44,7 +56,6 @@ dataset$Is.Tweet.Reply <- ifelse(dataset$Is.Tweet.Reply == 'True', 1, 0)
 # correlation between the variables
 correlations <- cor(dataset[,-c(1,2,6,7, 8,9, 13)])
 corrplot(correlations, method="circle")
-
 
 # we want to update the dataset to take into account columns that matter in our prediction
 x_data <- subset(dataset, select = -c(User.ID, Username, Tweet.Text, Tweet.Created.At, Day.Of.Week, Tweet.HashTags, X..of.Likes))
@@ -73,30 +84,40 @@ y_test <- y_data[-index,]
 linearRegression <- lm(y_train~., data = x_train)
 linearRegressionPredict <- predict(linearRegression, x_test, type="response")
 plot(linearRegressionPredict, y_test, xlab='Prediction', ylab='Actual', main='Linear Regression')
-linearRegressionR2 <- summary(linearRegression)$r.squared
-linearRegressionStandardError <- summary(linearRegression)$sigma
-summary(linearRegression)
+linearRegressionSummary <- summary(linearRegression)
+linearRegressionR2 <- linearRegressionSummary$r.squared
+linearRegressionStandardError <- linearRegressionSummary$sigma
 
 # KNN
 likesPredictionKNN <- knn(train=x_train, test=x_test, cl=y_train, k=15)
 plot(y_test, likesPredictionKNN, xlab='Actual', ylab='Prediction', main='KNN Regression for Predicting Likes')
-summary(lm(y_test~likesPredictionKNN))$r.square
-likesPredictionKNN.score
+knnSummary <- summary(lm(y_test~likesPredictionKNN))
+knnR2 <- knnSummary$r.squared
+knnStandardError <- knnSummary$sigma
 
 # CART
-str(x_train)
-cartModel <- rpart(y_train~., 
-                   data=x_train, method="anova")
+cartModel <- rpart(y_train~., data=x_train, method="anova")
 rpart.plot(cartModel)
+cartPredict <- predict(cartModel, x_test)
+cartSummary <- summary(lm(y_test~cartPredict))
+cartR2 <- cartSummary$r.squared
+cartStandardError <- cartSummary$sigma
 
-
- # Random Forest
+# Random Forest
 randomForestFit <- randomForest(y_train~., data=data.frame(x_train))
 randomForestFit
 importance(randomForestFit)
 varImpPlot(randomForestFit)
 randomForestPrediction <- predict(randomForestFit, x_test)
 plot(randomForestPrediction, y_test, xlab='Prediction', ylab='Actual')
- # check results
- # get accuracy and error rate for random forest
+randomForestSummary <- summary(lm(y_test~randomForestPrediction))
+randomForestR2 <- randomForestSummary$r.squared
+randomForestStandardError <- randomForestSummary$sigma
 
+# Create a Table to Compare R2 Scores and Standard Errors
+comparsionTable <- data.frame(
+  Model = c('Linear Regression', 'KNN', 'CART', 'RandomForest'),
+  R2Score = c(linearRegressionR2, knnR2, cartR2, randomForestR2),
+  StandardError = c(linearRegressionStandardError, knnStandardError, cartStandardError, randomForestStandardError)
+)
+comparsionTable
