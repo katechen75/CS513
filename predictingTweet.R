@@ -121,3 +121,9 @@ comparsionTable <- data.frame(
   StandardError = c(linearRegressionStandardError, knnStandardError, cartStandardError, randomForestStandardError)
 )
 comparsionTable
+
+# knowing that KNN and CART have high R2 scores, we can look at CART to see what variable is being used
+cartModel # we can see that it is only using # of Retweets
+
+# remove everything from the environment
+rm(list = ls())
