@@ -38,12 +38,18 @@ datasetAnalysis$X..of.Friends <- ifelse(dataset$X..of.Friends < 1000, "1000 >",
 
 # Comparing the Number of Retweets to Original Tweets
 retweetTable <- table(dataset$Is.Retweet)
-replyLabels <- paste(names(retweetTable), "\n", retweetTable, sep="")
-pie(retweetTable, labels=replyLabels, main="Distribution of Tweets that are Retweet vs Not Retweets")
+retweetPct <- round(retweetTable/sum(retweetTable) * 100)
+retweetLabels <- paste(retweetPct, "%", sep="")
+names(retweetTable)
+pie(retweetTable, labels=retweetLabels, main="Distribution of Tweets", col=topo.colors(length(retweetTable)))
+legend("topright", c("Not a Retweet", "Retweets"), fill=topo.colors(length(retweetTable)))
 
 # Desnity graph of Number of LIkes
 ggplot(dataset, aes(x=X..of.Likes)) + geom_density(fill='lightblue') +
-  geom_vline(aes(xintercept=mean(X..of.Likes)), color='red', linetype='dashed', size=1)
+  geom_vline(aes(xintercept=mean(X..of.Likes)), color='red', linetype='dashed', size=1) + 
+  theme_minimal() +
+  labs(title='Density of Likes', x="# of Likes", y='Density')
+  
 
 # Comparing Likes to Retweets
 ggplot(dataset, aes(x=X..of.Likes, y=X..of.Retweets)) + geom_point() + 
@@ -55,15 +61,16 @@ ggplot(dataset, aes(x=X..of.Likes, y=X..of.Retweets)) + geom_point() +
 followersTable <- table(datasetAnalysis$X..of.Followers)
 followersPct <- round(followersTable/sum(followersTable) * 100)
 followerLabels <- paste(followersPct, "%", sep="")
-followerLabels <- paste(followerLabels,names(followersTable))
-pie(followersTable, labels=followerLabels, main="Distrubtion of Followers")
+pie(followersTable, labels=followerLabels, main="Distrubtion of Followers", col=topo.colors(length(followersTable)))
+legend("topright", c("Between 1,000 to 10,000", "Less than 1,000", "More than 10,000"), fill=topo.colors(length(followersTable)))
 
 # Comparing # of Following
 followingTable <- table(datasetAnalysis$X..of.Friends)
 followingPct <- round(followingTable/sum(followingTable) * 100)
 followingLabels <- paste(followingPct, "%", sep="")
-followingLabels <- paste(followingLabels,names(followingTable))
-pie(followingTable, labels=followingLabels, main="Distrubtion of Followings")
+pie(followingTable, labels=followingLabels, main="Distrubtion of Followings", col=topo.colors(length(followersTable)))
+legend("topright", c("Between 1,000 to 10,000", "Less than 1,000", "More than 10,000"), fill=topo.colors(length(followingTable)))
+
 
 # Compare the Number of Tweets a User posts to their Followers
 ggplot(dataset, aes(x = X..of.Tweets, y = X..of.Followers)) + geom_point() +
@@ -113,10 +120,6 @@ x_test <- normalized_dataset[-index,]
 y_train <- y_data[index,]
 y_test <- y_data[-index,]
 
-ggplot(dataset, aes(x = X..of.Tweets, y = X..of.Followers)) + geom_point() +
-  geom_smooth() +
-  theme_minimal() +
-  labs(title='Tweets vs Followers', x="# of Tweets", y="# of Followers")
 # Linear Regression
 linearRegression <- lm(y_train~., data = x_train)
 linearRegressionPredict <- predict(linearRegression, x_test, type="response")
@@ -130,7 +133,7 @@ linearRegressionStandardError <- linearRegressionSummary$sigma
 
 # KNN
 likesPredictionKNN <- knn(train=x_train, test=x_test, cl=y_train, k=15)
-plot(y_test, likesPredictionKNN, xlab='Actual', ylab='Prediction', main='KNN Regression for Predicting Likes')
+plot(y_test,likesPredictionKNN, xlab='Actual', ylab='Prediction', main='KNN Regression for Predicting Likes')
 knnSummary <- summary(lm(y_test~likesPredictionKNN))
 knnR2 <- knnSummary$r.squared
 knnStandardError <- knnSummary$sigma
@@ -139,6 +142,10 @@ knnStandardError <- knnSummary$sigma
 cartModel <- rpart(y_train~., data=x_train, method="anova")
 rpart.plot(cartModel)
 cartPredict <- predict(cartModel, x_test)
+ggplot(NULL,aes(x=cartPredict, y=y_test)) + geom_point() +
+  geom_smooth() + 
+  theme_minimal() +
+  labs(title="CART", x="Prediction", y='Actual')
 cartSummary <- summary(lm(y_test~cartPredict))
 cartR2 <- cartSummary$r.squared
 cartStandardError <- cartSummary$sigma
