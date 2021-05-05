@@ -165,7 +165,6 @@ randomForestSummary <- summary(lm(y_test~randomForestPrediction))
 randomForestR2 <- randomForestSummary$r.squared
 randomForestStandardError <- randomForestSummary$sigma
 
-
 # Naive Bayes 
 naiveBayesModel <- naiveBayes(y_train~., x_train)
 naiveBayesPrediction <- predict(naiveBayesModel, x_test)
@@ -174,11 +173,22 @@ naiveBayesSummary <- summary(lm(y_test~naiveBayesPrediction))
 naiveBayesR2 <- naiveBayesSummary$r.squared
 naiveBayesStandardError <- naiveBayesSummary$sigma
 
+# SVM
+svmModel <- svm(y_train~., data=x_train)
+svmPrediction <- predict(svmModel,x_test)
+ggplot(NULL,aes(x=svmPrediction, y=y_test)) + geom_point() +
+  geom_smooth() + 
+  theme_minimal() +
+  labs(title="SVM", x="Prediction", y='Actual')
+svmSummary <- summary(lm(y_test~svmPrediction))
+svmR2 <- svmSummary$r.squared
+svmStandardError <- svmSummary$sigma
+
 # Create a Table to Compare R2 Scores and Standard Errors
 comparsionTable <- data.frame(
-  Model = c('Linear Regression', 'KNN', 'CART', 'RandomForest', 'Naive Bayes'),
-  R2Score = c(linearRegressionR2, knnR2, cartR2, randomForestR2, naiveBayesR2),
-  StandardError = c(linearRegressionStandardError, knnStandardError, cartStandardError, randomForestStandardError, naiveBayesStandardError)
+  Model = c('Linear Regression', 'KNN', 'CART', 'RandomForest', 'Naive Bayes', 'SVM'),
+  R2Score = c(linearRegressionR2, knnR2, cartR2, randomForestR2, naiveBayesR2, svmR2),
+  StandardError = c(linearRegressionStandardError, knnStandardError, cartStandardError, randomForestStandardError, naiveBayesStandardError, svmStandardError)
 )
 comparsionTable
 
