@@ -13,6 +13,8 @@ library(RColorBrewer)
 library(caret)
 library(dplyr)
 library(stringr)
+library(neuralnet)
+
 
 file <- file.choose()
 
@@ -163,11 +165,20 @@ randomForestSummary <- summary(lm(y_test~randomForestPrediction))
 randomForestR2 <- randomForestSummary$r.squared
 randomForestStandardError <- randomForestSummary$sigma
 
+
+# Naive Bayes 
+naiveBayesModel <- naiveBayes(y_train~., x_train)
+naiveBayesPrediction <- predict(naiveBayesModel, x_test)
+plot(y_test, naiveBayesPrediction, xlab='Actual', ylab='Prediction', main='Naive Bayes')
+naiveBayesSummary <- summary(lm(y_test~naiveBayesPrediction))
+naiveBayesR2 <- naiveBayesSummary$r.squared
+naiveBayesStandardError <- naiveBayesSummary$sigma
+
 # Create a Table to Compare R2 Scores and Standard Errors
 comparsionTable <- data.frame(
-  Model = c('Linear Regression', 'KNN', 'CART', 'RandomForest'),
-  R2Score = c(linearRegressionR2, knnR2, cartR2, randomForestR2),
-  StandardError = c(linearRegressionStandardError, knnStandardError, cartStandardError, randomForestStandardError)
+  Model = c('Linear Regression', 'KNN', 'CART', 'RandomForest', 'Naive Bayes'),
+  R2Score = c(linearRegressionR2, knnR2, cartR2, randomForestR2, naiveBayesR2),
+  StandardError = c(linearRegressionStandardError, knnStandardError, cartStandardError, randomForestStandardError, naiveBayesStandardError)
 )
 comparsionTable
 
