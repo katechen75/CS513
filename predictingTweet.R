@@ -42,7 +42,6 @@ datasetAnalysis$X..of.Friends <- ifelse(dataset$X..of.Friends < 1000, "1000 >",
 retweetTable <- table(dataset$Is.Retweet)
 retweetPct <- round(retweetTable/sum(retweetTable) * 100)
 retweetLabels <- paste(retweetPct, "%", sep="")
-names(retweetTable)
 pie(retweetTable, labels=retweetLabels, main="Distribution of Tweets", col=topo.colors(length(retweetTable)))
 legend("topright", c("Not a Retweet", "Retweets"), fill=topo.colors(length(retweetTable)))
 
